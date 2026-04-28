@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# build output (if you ever compile)
+dist/
+build/
+
+# compiled JS (only if you want TS-only repo)
+*.js
+*.js.map
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# editor folders
+.vscode/
+.idea/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# coverage (if testing later)
+coverage/
