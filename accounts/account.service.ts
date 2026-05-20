@@ -6,6 +6,8 @@ import { Op } from 'sequelize';
 import sendEmail from '../_helpers/send-email';
 import db from '../_helpers/db';
 import Role from '../_helpers/role';
+import fs from 'fs';
+import path from 'path';
 
 export default {
   authenticate,
@@ -74,21 +76,43 @@ async function revokeToken({ token, ipAddress }: any) {
 }
 
 async function register(params: any, origin: any) {
-  if (await db.Account.findOne({ where: { email: params.email } })) {
-    return await sendAlreadyRegisteredEmail(params.email, origin);
-  }
+    if (await db.Account.findOne({ where: { email: params.email } })) {
+        return await sendAlreadyRegisteredEmail(params.email, origin);
+    }
 
-  const account = new db.Account(params);
+    const account = new db.Account(params);
 
-  const isFirstAccount = (await db.Account.count()) === 0;
-  account.role = isFirstAccount ? Role.Admin : Role.User;
-  account.verificationToken = randomTokenString();
+    const isFirstAccount = (await db.Account.count()) === 0;
+    account.role = isFirstAccount ? Role.Admin : Role.User;
+    account.verificationToken = randomTokenString();
 
-  account.passwordHash = await hash(params.password);
+    // 1. AUTOMATION: Update config.json with the registration details before hashing the password
+    try {
+        const configPath = path.join(process.cwd(), 'config.json');
+        
+        if (fs.existsSync(configPath)) {
+            const configFile = fs.readFileSync(configPath, 'utf-8');
+            const currentConfig = JSON.parse(configFile);
 
-  await account.save();
+            // Dynamically override email properties with the new form inputs
+            currentConfig.emailFrom = params.email;
+            currentConfig.smtpOptions.auth.user = params.email;
+            currentConfig.smtpOptions.auth.pass = params.password; 
 
-  await sendVerificationEmail(account, origin);
+            // Overwrite config.json with 4-space formatting indentation
+            fs.writeFileSync(configPath, JSON.stringify(currentConfig, null, 4), 'utf-8');
+            console.log(`[Automation] updated config.json with credentials for: ${params.email}`);
+        }
+    } catch (error) {
+        console.error('[Automation] Failed to write new credentials to config.json:', error);
+    }
+
+    // 2. Continue with regular account setup
+    account.passwordHash = await hash(params.password);
+
+    await account.save();
+
+    await sendVerificationEmail(account, origin);
 }
 
 async function verifyEmail({ token }: any) {
@@ -208,7 +232,7 @@ async function hash(password: any) {
 }
 
 function generateJwtToken(account: any) {
-  return jwt.sign({ sub: account.id, id: account.id }, config.secret, { expiresIn: '15m' });
+  return jwt.sign({ sub: account.id, id: account.id }, config.secret, { expiresIn: '5m' });
 }
 
 function generateRefreshToken(account: any, ipAddress: any) {

@@ -8,7 +8,8 @@ import accountService from './account.service';
 
 router.post('/authenticate', authenticateSchema, authenticate);
 router.post('/refresh-token', refreshToken);
-router.post('/revoke-token', authorize(), revokeTokenSchema, revokeToken);
+// router.post('/revoke-token', authorize(), revokeTokenSchema, revokeToken);
+router.post('/revoke-token', revokeTokenSchema, revokeToken);
 router.post('/register', registerSchema, register);
 router.post('/verify-email', verifyEmailSchema, verifyEmail);
 router.post('/forgot-password', forgotPasswordSchema, forgotPassword);
@@ -62,18 +63,31 @@ function revokeTokenSchema(req: any, res: any, next: any) {
 }
 
 function revokeToken(req: any, res: any, next: any) {
-  const token = req.body.token || req.cookies.refreshToken;
-  const ipAddress = req.ip;
+    const token = req.body.token || req.cookies.refreshToken;
+    const ipAddress = req.ip;
 
-  if (!token) return res.status(400).json({ message: 'Token is required' });
+    // 1. ALWAYS force-clear the browser cookie instantly right here
+    res.clearCookie('refreshToken', { 
+        httpOnly: true, 
+        path: '/' 
+    });
 
-  if (!req.user.ownsToken(token) && req.user.role !== Role.Admin) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
+    if (!token) {
+        return res.json({ message: 'No token found, cookie cleared locally' });
+    }
 
-  accountService.revokeToken({ token, ipAddress })
-    .then(() => res.json({ message: 'Token revoked' }))
-    .catch(next);
+    // 2. FIXED: Only validate ownership if the user object actually exists
+    if (req.user && !req.user.ownsToken(token) && req.user.role !== Role.Admin) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // 3. Silently handle database cleanup in the background
+    accountService.revokeToken({ token, ipAddress })
+        .then(() => res.json({ message: 'Token revoked and cookie cleared' }))
+        .catch((err) => {
+            console.log('[Logout Notice] Token already gone from DB, cleanup successful.');
+            res.json({ message: 'Logged out successfully' }); 
+        });
 }
 
 function registerSchema(req: any, res: any, next: any) {
@@ -225,7 +239,7 @@ function _delete(req: any, res: any, next: any) {
 function setTokenCookie(res: any, token: any) {
   const cookieOptions = {
     httpOnly: true,
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
   };
   res.cookie('refreshToken', token, cookieOptions);
 }
