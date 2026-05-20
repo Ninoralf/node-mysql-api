@@ -10,7 +10,7 @@ export default async function sendEmail({ to, subject, html, from }: any) {
   if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
     smtpOptions = {
       host: process.env.SMTP_HOST || "smtp.ethereal.email",
-      port: Number(process.env.SMTP_PORT) || 587,
+      port: Number(process.env.SMTP_PORT) || 456,
       secure: false, 
       auth: {
         user: process.env.SMTP_USER,
