@@ -18,13 +18,23 @@ async function initialize() {
     console.log('🚀 Running on Render Cloud. Connecting to TiDB Serverless...');
     
     const host = process.env.DB_HOST;
-    const port = Number(process.env.DB_PORT) || 4000; // TiDB defaults to port 4000
+    const port = Number(process.env.DB_PORT) || 4000;
     const user = process.env.DB_USER;
     const password = process.env.DB_PASSWORD;
     const database = process.env.DB_NAME || 'node_mysql_api';
 
-    // Establish raw initial connection to ensure target database space schema exists
-    const connection = await mysql.createConnection({ host, port, user, password });
+    // FIX: Pass the ssl config to the raw initial connection too!
+    const connection = await mysql.createConnection({ 
+        host, 
+        port, 
+        user, 
+        password,
+        ssl: {
+            minVersion: 'TLSv1.2',
+            rejectUnauthorized: true
+        }
+    });
+    
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
     await connection.end(); // Cleanly close raw initial connection handshake
 
@@ -36,10 +46,10 @@ async function initialize() {
       dialectOptions: {
         ssl: {
           minVersion: 'TLSv1.2',
-          rejectUnauthorized: true // Enforces security validation across the cloud
+          rejectUnauthorized: true 
         }
       },
-      logging: false // Keeps your Render logs clean from SQL queries
+      logging: false 
     });
 
     db.Account = accountModel(sequelize);
