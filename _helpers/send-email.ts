@@ -7,15 +7,19 @@ export default async function sendEmail({ to, subject, html, from }: any) {
   let smtpOptions;
   let emailFrom;
 
-  // FIX: Force production mode if we are running on Render OR if environment keys are present
   if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
     smtpOptions = {
       host: process.env.SMTP_HOST || "smtp.ethereal.email",
       port: Number(process.env.SMTP_PORT) || 587,
+      secure: false, 
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+      // ADD THESE TIMEOUT RULES TO PREVENT STALLING:
+      connectionTimeout: 5000, // 5 seconds max to connect
+      greetingTimeout: 5000,   // 5 seconds max to greet
+      socketTimeout: 5000      // 5 seconds max of inactivity
     };
     emailFrom = process.env.EMAIL_FROM || "noreply@ethereal.email";
   } else {
@@ -32,5 +36,7 @@ export default async function sendEmail({ to, subject, html, from }: any) {
 
   const fromAddress = from || emailFrom;
   const transporter = nodemailer.createTransport(smtpOptions);
+  
+  // Send the email
   await transporter.sendMail({ from: fromAddress, to, subject, html });
 }
