@@ -9,10 +9,13 @@ export default async function sendEmail({ to, subject, html, from }: any) {
 
   // 1. Configure options based on environment
   if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
+    const port = Number(process.env.SMTP_PORT) || 587; // Default to 587 instead of 465
+    
     smtpOptions = {
       host: process.env.SMTP_HOST || "smtp.ethereal.email",
-      port: Number(process.env.SMTP_PORT) || 465, // Fixed typo from 456 to 465
-      secure: true, // Must be true for port 465
+      port: port,
+      // secure must be TRUE for port 465, but FALSE for port 587
+      secure: port === 465, 
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
