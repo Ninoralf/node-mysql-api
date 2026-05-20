@@ -10,8 +10,8 @@ export default async function sendEmail({ to, subject, html, from }: any) {
   // 1. Check if the application is running live on Render
   if (process.env.NODE_ENV === 'production') {
     smtpOptions = {
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
+      host: process.env.SMTP_HOST || "smtp.ethereal.email",
+      port: Number(process.env.SMTP_PORT) || 587,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
