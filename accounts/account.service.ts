@@ -86,25 +86,30 @@ async function register(params: any, origin: any) {
     account.role = isFirstAccount ? Role.Admin : Role.User;
     account.verificationToken = randomTokenString();
 
-    // 1. AUTOMATION: Update config.json with the registration details before hashing the password
-    try {
-        const configPath = path.join(process.cwd(), 'config.json');
-        
-        if (fs.existsSync(configPath)) {
-            const configFile = fs.readFileSync(configPath, 'utf-8');
-            const currentConfig = JSON.parse(configFile);
+    // FIXED AUTOMATION SAFETY GUARD FOR RENDER
+    // Only attempt to read and write to config.json if NOT running in production on Render
+    if (process.env.NODE_ENV !== 'production') {
+        try {
+            const configPath = path.join(process.cwd(), 'config.json');
+            
+            if (fs.existsSync(configPath)) {
+                const configFile = fs.readFileSync(configPath, 'utf-8');
+                const currentConfig = JSON.parse(configFile);
 
-            // Dynamically override email properties with the new form inputs
-            currentConfig.emailFrom = params.email;
-            currentConfig.smtpOptions.auth.user = params.email;
-            currentConfig.smtpOptions.auth.pass = params.password; 
+                // Dynamically override email properties with the new form inputs
+                currentConfig.emailFrom = params.email;
+                currentConfig.smtpOptions.auth.user = params.email;
+                currentConfig.smtpOptions.auth.pass = params.password; 
 
-            // Overwrite config.json with 4-space formatting indentation
-            fs.writeFileSync(configPath, JSON.stringify(currentConfig, null, 4), 'utf-8');
-            console.log(`[Automation] updated config.json with credentials for: ${params.email}`);
+                // Overwrite config.json with 4-space formatting indentation
+                fs.writeFileSync(configPath, JSON.stringify(currentConfig, null, 4), 'utf-8');
+                console.log(`[Automation] Local testing mode: updated config.json with credentials for: ${params.email}`);
+            }
+        } catch (error) {
+            console.error('[Automation] Failed to write new credentials to config.json:', error);
         }
-    } catch (error) {
-        console.error('[Automation] Failed to write new credentials to config.json:', error);
+    } else {
+        console.log('[Automation Skip] Running on Render production. Skipped rewriting config.json to disk.');
     }
 
     // 2. Continue with regular account setup
