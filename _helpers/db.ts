@@ -3,9 +3,9 @@ import mysql from 'mysql2/promise';
 import { Sequelize } from 'sequelize';
 import accountModel from '../accounts/account.model';
 import refreshTokenModel from '../accounts/refresh-token.model';
-import nodemailer from 'nodemailer'; // <-- 1. Import nodemailer
-import fs from 'fs';                 // <-- 2. Import fs to read/write files
-import path from 'path';             // <-- 3. Import path helper
+import nodemailer from 'nodemailer'; 
+import fs from 'fs';                 
+import path from 'path';             
 
 const db: any = {};
 export default db;
@@ -13,30 +13,46 @@ export default db;
 initialize();
 
 async function initialize() {
-  // Add this block to bypass file writing if we are running in production / on Render
+  // 1. PRODUCTION MODE (Render + TiDB Cloud)
   if (process.env.NODE_ENV === 'production') {
-    console.log('🚀 Running on Render Cloud. Bypassing config.json disk writing automation.');
+    console.log('🚀 Running on Render Cloud. Connecting to TiDB Serverless...');
     
-    // Continue establishing database connection normally using variables instead of raw files
-    const host = process.env.DB_HOST || config.database.host;
-    const port = Number(process.env.DB_PORT) || config.database.port;
-    const user = process.env.DB_USER || config.database.user;
-    const password = process.env.DB_PASSWORD || config.database.password;
-    const database = process.env.DB_NAME || config.database.database;
+    const host = process.env.DB_HOST;
+    const port = Number(process.env.DB_PORT) || 4000; // TiDB defaults to port 4000
+    const user = process.env.DB_USER;
+    const password = process.env.DB_PASSWORD;
+    const database = process.env.DB_NAME || 'node_mysql_api';
 
+    // Establish raw initial connection to ensure target database space schema exists
     const connection = await mysql.createConnection({ host, port, user, password });
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-    const sequelize = new Sequelize(database, user, password, { host, port, dialect: 'mysql' });
+    await connection.end(); // Cleanly close raw initial connection handshake
+
+    // Initialize Sequelize configured explicitly for TiDB's SSL requirements
+    const sequelize = new Sequelize(database, user!, password, { 
+      host, 
+      port, 
+      dialect: 'mysql',
+      dialectOptions: {
+        ssl: {
+          minVersion: 'TLSv1.2',
+          rejectUnauthorized: true // Enforces security validation across the cloud
+        }
+      },
+      logging: false // Keeps your Render logs clean from SQL queries
+    });
 
     db.Account = accountModel(sequelize);
     db.RefreshToken = refreshTokenModel(sequelize);
     db.Account.hasMany(db.RefreshToken, { onDelete: 'CASCADE' });
     db.RefreshToken.belongsTo(db.Account);
+    
     await sequelize.sync({ alter: true });
+    console.log('✅ TiDB Cloud database models synchronized successfully!');
     return; // Exit out early!
   }
 
-  // --- YOUR ORIGINAL LOCAL DEVELOPMENT AUTOMATION CODE ---
+  // 2. LOCAL DEVELOPMENT MODE (Your Local Machine)
   if (!config.smtpOptions.auth.user || config.smtpOptions.auth.user === "ora.dickinson31@ethereal.email") {
     console.log('🔄 Requesting a fresh dynamic Ethereal account...');
     try {
@@ -57,11 +73,19 @@ async function initialize() {
   const { host, port, user, password, database } = config.database;
   const connection = await mysql.createConnection({ host, port, user, password });
   await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-  const sequelize = new Sequelize(database, user, password, { dialect: 'mysql' });
+  await connection.end();
+
+  const sequelize = new Sequelize(database, user, password, { 
+    host,
+    port,
+    dialect: 'mysql' 
+  });
 
   db.Account = accountModel(sequelize);
   db.RefreshToken = refreshTokenModel(sequelize);
   db.Account.hasMany(db.RefreshToken, { onDelete: 'CASCADE' });
   db.RefreshToken.belongsTo(db.Account);
+  
   await sequelize.sync({ alter: true });
+  console.log('💻 Local development database models synchronized successfully!');
 }
