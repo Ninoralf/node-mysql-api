@@ -7,13 +7,13 @@
         "database": "node_mysql_api"
     },
     "secret": "SUPER_SECRET_KEY_REPLACE_ME_IN_PRODUCTION",
-    "emailFrom": "okey.willms@ethereal.email",
+    "emailFrom": "heidi.schumm@ethereal.email",
     "smtpOptions": {
         "host": "smtp.ethereal.email",
         "port": 587,
         "auth": {
-            "user": "okey.willms@ethereal.email",
-            "pass": "AE5EDCvcSWZNRNXv2c"
+            "user": "heidi.schumm@ethereal.email",
+            "pass": "aYm2rVBrjcrGW3jWRb"
         }
     }
 }

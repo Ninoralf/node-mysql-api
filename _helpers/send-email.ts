@@ -1,43 +1,30 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import fs from 'fs';
 import path from 'path';
 import fallbackConfig from '../config.json'; 
 
-export default async function sendEmail({ to, subject, html, from }: any) {
-  let smtpOptions;
+export default async function sendEmail({ to, subject, html }: any) {
   let emailFrom;
+  let apiKey = process.env.RESEND_API_KEY;
 
   // 1. Configure options based on environment
-  if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
-    const port = Number(process.env.SMTP_PORT) || 587; // Default to 587 instead of 465
-    
-    smtpOptions = {
-      host: process.env.SMTP_HOST || "smtp.ethereal.email",
-      port: port,
-      // secure must be TRUE for port 465, but FALSE for port 587
-      secure: port === 465, 
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      },
-      connectionTimeout: 4000, 
-      greetingTimeout: 4000,   
-      socketTimeout: 4000      
-    };
-    emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@ethereal.email";
+  if (process.env.NODE_ENV === 'production' || process.env.RESEND_API_KEY) {
+    // Resend sandbox requires 'onboarding@resend.dev' as the "From" address
+    emailFrom = process.env.EMAIL_FROM || "onboarding@resend.dev";
   } else {
     try {
       const configPath = path.join(process.cwd(), 'config.json');
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      smtpOptions = config.smtpOptions;
-      emailFrom = config.emailFrom;
+      emailFrom = config.emailFrom || "onboarding@resend.dev";
+      if (!apiKey && config.resendApiKey) {
+        apiKey = config.resendApiKey;
+      }
     } catch (error) {
-      smtpOptions = fallbackConfig.smtpOptions;
-      emailFrom = fallbackConfig.emailFrom;
+      emailFrom = fallbackConfig.emailFrom || "onboarding@resend.dev";
     }
   }
 
-  // 2. Fallback printout rule: Always push the registration links to the Render Terminal immediately
+  // 2. Fallback printout rule: Always push the registration links to the Render Terminal
   console.log(`==================================================`);
   console.log(`✉️ OUTBOUND EMAIL TO: ${to}`);
   console.log(`Subject: ${subject}`);
@@ -49,13 +36,23 @@ export default async function sendEmail({ to, subject, html, from }: any) {
   }
   console.log(`==================================================`);
 
-  // 3. Attempt mail transmission safely within a try/catch sandbox block
+  // 3. Attempt mail transmission safely via Resend HTTP API (Bypasses Render's network blocks)
   try {
-    const transporter = nodemailer.createTransport(smtpOptions);
-    await transporter.sendMail({ from: emailFrom, to, subject, html });
-    console.log("✅ Mail delivered successfully via SMTP server.");
+    if (!apiKey) {
+      throw new Error("Missing RESEND_API_KEY environment variable.");
+    }
+
+    const resend = new Resend(apiKey);
+
+    await resend.emails.send({
+      from: emailFrom, // Uses 'onboarding@resend.dev'
+      to: [to],
+      subject: subject,
+      html: html
+    });
+
+    console.log("✅ Mail delivered successfully via Resend API.");
   } catch (error) {
-    // If Render blocks the port, we catch the error here so the backend server doesn't freeze or crash!
-    console.log("⚠️ SMTP connection blocked or timed out, relying gracefully on terminal link fallback.");
+    console.log("⚠️ Resend API transmission failed, relying gracefully on terminal link fallback:", error);
   }
 }
