@@ -167,8 +167,9 @@ async function resetPassword({ token, password }: any) {
 }
 
 async function getAll() {
-  const accounts = await db.Account.findAll();
-  return accounts.map((x: any) => basicDetails(x));
+    const accounts = await db.Account.findAll();
+    // Maps rows into plain JSON objects so that acc.id is directly accessible
+    return accounts.map(acc => acc.get({ plain: true }));
 }
 
 async function getById(id: any) {
@@ -177,18 +178,19 @@ async function getById(id: any) {
 }
 
 async function create(params: any) {
-  if (await db.Account.findOne({ where: { email: params.email } })) {
-    throw 'Email "' + params.email + '" is already registered';
-  }
+    // validate
+    if (await db.Account.findOne({ where: { email: params.email } })) {
+        throw 'Email "' + params.email + '" is already registered';
+    }
 
-  const account = new db.Account(params);
-  account.verified = Date.now();
+    const account = new db.Account(params);
+    account.passwordHash = await bcrypt.hash(params.password, 10);
+    
+    // save account
+    await account.save();
 
-  account.passwordHash = await hash(params.password);
-
-  await account.save();
-
-  return basicDetails(account);
+    // Return clean plain details back to the client application
+    return account.get({ plain: true });
 }
 
 async function update(id: any, params: any) {
