@@ -46,7 +46,7 @@ export default async function sendEmail({ to, subject, html }: any) {
 
     await resend.emails.send({
       from: emailFrom, // Uses 'onboarding@resend.dev'
-      to: to,
+      to: "ninoralfdcruz@gmail.com", // to
       subject: subject,
       html: html
     });
