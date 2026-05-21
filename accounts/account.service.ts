@@ -167,9 +167,12 @@ async function resetPassword({ token, password }: any) {
 }
 
 async function getAll() {
+    // 1. Fetch all accounts from your TiDB database using Sequelize
     const accounts = await db.Account.findAll();
-    // Maps rows into plain JSON objects so that acc.id is directly accessible
-    return accounts.map(acc => acc.get({ plain: true }));
+    
+    // 2. Map them using the basicDetails helper already at the bottom of your file
+    // This extracts clean properties and guarantees lowercase 'id' is sent to Angular!
+    return accounts.map(account => basicDetails(account));
 }
 
 async function getById(id: any) {
@@ -178,19 +181,19 @@ async function getById(id: any) {
 }
 
 async function create(params: any) {
-    // validate
     if (await db.Account.findOne({ where: { email: params.email } })) {
         throw 'Email "' + params.email + '" is already registered';
     }
 
     const account = new db.Account(params);
-    account.passwordHash = await bcrypt.hash(params.password, 10);
-    
-    // save account
+    account.verified = Date.now();
+
+    account.passwordHash = await hash(params.password);
+
     await account.save();
 
-    // Return clean plain details back to the client application
-    return account.get({ plain: true });
+    // Returns a plain details object with the newly created user's id
+    return basicDetails(account);
 }
 
 async function update(id: any, params: any) {
