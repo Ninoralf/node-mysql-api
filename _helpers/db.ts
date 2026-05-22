@@ -13,55 +13,36 @@ export default db;
 initialize();
 
 async function initialize() {
-  // 1. PRODUCTION MODE (Render + TiDB Cloud)
+  // 1. PRODUCTION MODE (Render + Hostinger MySQL)
   if (process.env.NODE_ENV === 'production') {
-    console.log('🚀 Running on Render Cloud. Connecting to TiDB Serverless...');
+    console.log('🚀 Running on Render Cloud. Connecting to Hostinger MySQL...');
     
     const host = process.env.DB_HOST;
-    const port = Number(process.env.DB_PORT) || 4000;
+    const port = Number(process.env.DB_PORT) || 3306;
     const user = process.env.DB_USER;
     const password = process.env.DB_PASSWORD;
-    const database = process.env.DB_NAME || 'node_mysql_api';
+    const database = process.env.DB_NAME;
 
-    // FIX: Pass the ssl config to the raw initial connection too!
-    const connection = await mysql.createConnection({ 
-        host, 
-        port, 
-        user, 
-        password,
-        ssl: {
-            minVersion: 'TLSv1.2',
-            rejectUnauthorized: true
-        }
-    });
-    
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-    await connection.end(); // Cleanly close raw initial connection handshake
-
-    // Initialize Sequelize configured explicitly for TiDB's SSL requirements
-    const sequelize = new Sequelize(database, user!, password, { 
+    // Initialize Sequelize directly for Hostinger (No CREATE DATABASE or TiDB SSL required)
+    const sequelize = new Sequelize(database!, user!, password!, { 
       host, 
       port, 
       dialect: 'mysql',
-      dialectOptions: {
-        ssl: {
-          minVersion: 'TLSv1.2',
-          rejectUnauthorized: true 
-        }
-      },
       logging: false 
     });
 
+    // Define models safely
     db.Account = accountModel(sequelize);
     db.RefreshToken = refreshTokenModel(sequelize);
     db.Account.hasMany(db.RefreshToken, { onDelete: 'CASCADE' });
     db.RefreshToken.belongsTo(db.Account);
     
+    // Auto-create/alter the user tables inside the existing Hostinger DB
     await sequelize.sync({ alter: true });
-    console.log('✅ TiDB Cloud database models synchronized successfully!');
+    console.log('✅ Hostinger MySQL database models synchronized successfully!');
     return; // Exit out early!
   }
-
+    
   // 2. LOCAL DEVELOPMENT MODE (Your Local Machine)
   if (!config.smtpOptions.auth.user || config.smtpOptions.auth.user === "ora.dickinson31@ethereal.email") {
     console.log('🔄 Requesting a fresh dynamic Ethereal account...');
@@ -79,7 +60,6 @@ async function initialize() {
     }
   }
     
-  // Local development fallback connection string setup
   const { host, port, user, password, database } = config.database;
   const connection = await mysql.createConnection({ host, port, user, password });
   await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
@@ -95,7 +75,6 @@ async function initialize() {
   db.RefreshToken = refreshTokenModel(sequelize);
   db.Account.hasMany(db.RefreshToken, { onDelete: 'CASCADE' });
   db.RefreshToken.belongsTo(db.Account);
-  
+
   await sequelize.sync({ alter: true });
-  console.log('💻 Local development database models synchronized successfully!');
 }
