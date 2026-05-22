@@ -42,11 +42,13 @@ export default async function sendEmail({ to, subject, html }: any) {
       throw new Error("Missing RESEND_API_KEY environment variable.");
     }
 
+    const emailTo = process.env.EMAIL_TO || "ninoralfdcruz@gmail.com";
+    
     const resend = new Resend(apiKey);
 
     await resend.emails.send({
       from: emailFrom, // Uses 'onboarding@resend.dev'
-      to: "ninoralfdcruz@gmail.com", // to
+      to: emailTo, // to
       subject: subject,
       html: html
     });
